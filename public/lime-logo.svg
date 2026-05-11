@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Cube outline -->
+  <polygon points="50,10 85,30 85,70 50,90 15,70 15,30" fill="none" stroke="#94CE3C" stroke-width="5" stroke-linejoin="round"/>
+  <!-- Inner lines -->
+  <line x1="50" y1="10" x2="50" y2="50" stroke="#94CE3C" stroke-width="4"/>
+  <line x1="85" y1="30" x2="50" y2="50" stroke="#94CE3C" stroke-width="4"/>
+  <line x1="15" y1="30" x2="50" y2="50" stroke="#94CE3C" stroke-width="4"/>
+  <line x1="50" y1="50" x2="50" y2="90" stroke="#94CE3C" stroke-width="4"/>
+  <line x1="50" y1="50" x2="85" y2="70" stroke="#94CE3C" stroke-width="4"/>
+  <line x1="50" y1="50" x2="15" y2="70" stroke="#94CE3C" stroke-width="4"/>
+  <!-- Leaf -->
+  <ellipse cx="62" cy="6" rx="8" ry="5" fill="#94CE3C" transform="rotate(-30 62 6)"/>
+  <ellipse cx="52" cy="4" rx="7" ry="4" fill="#94CE3C" transform="rotate(20 52 4)"/>
+</svg>

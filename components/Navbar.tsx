@@ -1,14 +1,17 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { getSupabaseBrowser } from "@/lib/supabase";
 
 const links = [
-  { href: "/", label: "Dashboard" },
-  { href: "/upload", label: "Upload" },
-  { href: "/chat", label: "Chat" },
+  { href: "/", label: "Dashboard", exact: true },
+  { href: "/upload", label: "Upload", exact: true },
+  { href: "/documents", label: "Documents", exact: false },
+  { href: "/chat", label: "Chat", exact: false },
+  { href: "/admin/sync", label: "Sync Excel", exact: true },
 ];
 
 export default function Navbar() {
@@ -30,25 +33,29 @@ export default function Navbar() {
     router.refresh();
   };
 
-  // Don't show nav on login page
   if (pathname === "/auth/login") return null;
 
   return (
-    <nav className="border-b bg-white">
+    <nav className="bg-[#94CE3C] shadow-sm">
       <div className="max-w-6xl mx-auto px-6 flex items-center h-14 gap-8">
-        <Link href="/" className="font-bold text-lg tracking-tight">
-          <span className="text-[#4B1F93]">Bid</span>
-          <span className="text-[#94CE3C]">Brain</span>
+        <Link href="/" className="flex items-center gap-2 font-bold text-lg tracking-tight text-white">
+          <Image
+            src="/lime-icon.png"
+            alt="Lime Media"
+            width={36}
+            height={36}
+          />
+          BidBrain
         </Link>
         <div className="flex gap-1 flex-1">
-          {links.map(({ href, label }) => (
+          {links.map(({ href, label, exact }) => (
             <Link
               key={href}
               href={href}
               className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                pathname === href
-                  ? "bg-[#94CE3C]/10 text-[#4B1F93]"
-                  : "text-gray-600 hover:bg-gray-100"
+                (exact ? pathname === href : pathname.startsWith(href))
+                  ? "bg-white/25 text-white"
+                  : "text-white/80 hover:bg-white/15 hover:text-white"
               }`}
             >
               {label}
@@ -57,10 +64,10 @@ export default function Navbar() {
         </div>
         {email && (
           <div className="flex items-center gap-3">
-            <span className="text-xs text-gray-500">{email}</span>
+            <span className="text-xs text-white/70">{email}</span>
             <button
               onClick={handleLogout}
-              className="text-xs text-gray-400 hover:text-gray-600 font-medium"
+              className="text-xs text-white/70 hover:text-white font-medium transition-colors"
             >
               Sign out
             </button>
