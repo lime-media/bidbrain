@@ -6,7 +6,7 @@ import Link from "next/link";
 interface SyncResults {
   materials?: { added: number; updated: number; deactivated: number };
   vendor_materials?: { added: number; updated: number; deactivated: number };
-  price_history?: { added: number; skipped: number };
+  price_history?: { added: number; skipped: number; errors?: string[] };
   dimensions?: { upserted: number };
   categories?: { upserted: number };
 }
@@ -142,7 +142,18 @@ export default function SyncPage() {
               </tbody>
             </table>
           </div>
-        </div>
+
+        {results.price_history?.errors && results.price_history.errors.length > 0 && (
+          <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 px-4 py-3 space-y-1">
+            <p className="text-sm font-semibold text-red-700 dark:text-red-400">
+              {results.price_history.errors.length} row(s) failed to insert:
+            </p>
+            {results.price_history.errors.map((e, i) => (
+              <p key={i} className="text-xs font-mono text-red-600 dark:text-red-400">{e}</p>
+            ))}
+          </div>
+        )}
+      </div>
       )}
     </main>
   );

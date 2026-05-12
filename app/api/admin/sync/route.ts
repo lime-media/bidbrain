@@ -17,15 +17,24 @@ function bool(v: unknown): boolean {
   return str(v).toUpperCase() === "Y";
 }
 function excelDate(serial: unknown): string | null {
+  // Try numeric Excel serial first (most common)
   const n = num(serial);
-  if (!n) return null;
-  try {
-    const d = XLSX.SSF.parse_date_code(n);
-    if (!d) return null;
-    return `${d.y}-${String(d.m).padStart(2, "0")}-${String(d.d).padStart(2, "0")}`;
-  } catch {
-    return null;
+  if (n) {
+    try {
+      const d = XLSX.SSF.parse_date_code(n);
+      if (d) return `${d.y}-${String(d.m).padStart(2, "0")}-${String(d.d).padStart(2, "0")}`;
+    } catch { /* fall through */ }
   }
+  // Fall back to text date parsing (e.g. "2/25/26", "2025-12-03", "Feb 25 2026")
+  const s = str(serial);
+  if (!s) return null;
+  const parsed = new Date(s);
+  if (!isNaN(parsed.getTime())) {
+    // Two-digit year "2/25/26" → JS parses as 1926, fix to 2000s
+    const y = parsed.getFullYear() < 100 ? parsed.getFullYear() + 2000 : parsed.getFullYear();
+    return `${y}-${String(parsed.getMonth() + 1).padStart(2, "0")}-${String(parsed.getDate()).padStart(2, "0")}`;
+  }
+  return null;
 }
 function normalizeVendorName(raw: string): string {
   return raw
@@ -200,6 +209,7 @@ async function syncPriceHistory(supabase: ReturnType<typeof getSupabaseServer>, 
   );
 
   let added = 0, skipped = 0;
+  const errors: string[] = [];
 
   for (const row of rows) {
     const limeId = str(row["LIME Material ID"]);
@@ -208,7 +218,10 @@ async function syncPriceHistory(supabase: ReturnType<typeof getSupabaseServer>, 
     const quoteId = str(num(row["Quote ID"]) ?? row["Quote ID"]);
     const quoteDate = excelDate(row["Quote Date"]);
     const unitPrice = num(row["Price unit"]);
-    const key = `${limeId}|${quoteId}|${quoteDate}|${unitPrice}`;
+
+    // Dedup key: normalize unit_price to 4 decimal places to match DB storage
+    const priceKey = unitPrice != null ? unitPrice.toFixed(4) : "null";
+    const key = `${limeId}|${quoteId}|${quoteDate}|${priceKey}`;
 
     if (existingSet.has(key)) { skipped++; continue; }
 
@@ -217,7 +230,7 @@ async function syncPriceHistory(supabase: ReturnType<typeof getSupabaseServer>, 
     const vendor_id = vendorMap[normalizedVendor.toLowerCase()] ?? null;
     const material_id = matMap[limeId] ?? null;
 
-    await supabase.from("price_records").insert({
+    const { error } = await supabase.from("price_records").insert({
       material_id,
       vendor_id,
       document_id: null,
@@ -236,10 +249,15 @@ async function syncPriceHistory(supabase: ReturnType<typeof getSupabaseServer>, 
       match_confidence: "high",
       notes: str(row["Notes"]) || null,
     });
-    added++;
+
+    if (error) {
+      errors.push(`Row ${limeId}/${quoteId}: ${error.message}`);
+    } else {
+      added++;
+    }
   }
 
-  return { added, skipped };
+  return { added, skipped, errors: errors.length > 0 ? errors : undefined };
 }
 
 async function syncDimensions(supabase: ReturnType<typeof getSupabaseServer>, rawRows: unknown[][]) {
