@@ -96,7 +96,7 @@ async function preFetchByQuoteId(
         .from("price_records")
         .select("*", { count: "exact", head: true })
         .ilike("quote_id", `%${qid}%`);
-      const row = prRows[0] as { quote_id: string; quote_date: string; vendors: { name: string } | null };
+      const row = prRows[0] as unknown as { quote_id: string; quote_date: string; vendors: { name: string } | { name: string }[] | null };
       const vendor = Array.isArray(row.vendors) ? row.vendors[0] : row.vendors;
       results.push({ found: true, quote_id: qid, source: "price_records", vendor_name: vendor?.name ?? null, quote_date: row.quote_date, item_count: count ?? 0 });
       continue;
@@ -110,7 +110,7 @@ async function preFetchByQuoteId(
       .limit(1);
 
     if (docRows && docRows.length > 0) {
-      const row = docRows[0] as { quote_id: string; document_date: string; vendors: { name: string } | null };
+      const row = docRows[0] as unknown as { quote_id: string; document_date: string; vendors: { name: string } | { name: string }[] | null };
       const vendor = Array.isArray(row.vendors) ? row.vendors[0] : row.vendors;
       results.push({ found: true, quote_id: qid, source: "documents", vendor_name: vendor?.name ?? null, quote_date: row.document_date, item_count: 1 });
       continue;
