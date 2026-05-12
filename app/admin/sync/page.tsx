@@ -48,33 +48,33 @@ export default function SyncPage() {
 
   return (
     <main className="max-w-2xl mx-auto px-6 py-10 space-y-8">
-      <Link href="/" className="text-sm text-[#5a8a15] hover:underline">← Dashboard</Link>
+      <Link href="/" className="text-sm text-[#5a8a15] dark:text-[#94CE3C] hover:underline">← Dashboard</Link>
 
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Sync Excel → Supabase</h1>
-        <p className="text-sm text-gray-500 mt-1">
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Sync Excel → Supabase</h1>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
           Upload the master Excel file to add, update, or deactivate records in all tables.
           Rows removed from Excel will be marked inactive (not deleted).
         </p>
       </div>
 
       {/* What gets synced */}
-      <div className="rounded-xl border border-gray-200 overflow-hidden">
-        <div className="bg-gray-50 px-4 py-2.5 border-b border-gray-200">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Sheets synced</p>
+      <div className="rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <div className="bg-gray-50 dark:bg-gray-800 px-4 py-2.5 border-b border-gray-200 dark:border-gray-700">
+          <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Sheets synced</p>
         </div>
         <table className="w-full text-sm">
           <thead>
-            <tr className="text-left text-xs text-gray-400 border-b border-gray-100">
+            <tr className="text-left text-xs text-gray-400 dark:text-gray-500 border-b border-gray-100 dark:border-gray-700">
               <th className="px-4 py-2 font-medium">Excel sheet</th>
               <th className="px-4 py-2 font-medium">Supabase table</th>
             </tr>
           </thead>
           <tbody>
             {SHEET_MAP.map((s) => (
-              <tr key={s.key} className="border-t border-gray-100">
-                <td className="px-4 py-2 font-mono text-xs text-gray-700">{s.label}</td>
-                <td className="px-4 py-2 text-gray-500">{s.table}</td>
+              <tr key={s.key} className="border-t border-gray-100 dark:border-gray-700">
+                <td className="px-4 py-2 font-mono text-xs text-gray-700 dark:text-gray-300">{s.label}</td>
+                <td className="px-4 py-2 text-gray-500 dark:text-gray-400">{s.table}</td>
               </tr>
             ))}
           </tbody>
@@ -83,11 +83,11 @@ export default function SyncPage() {
 
       {/* File picker */}
       <div className="space-y-3">
-        <label className="block text-sm font-medium text-gray-700">Excel file (.xlsx)</label>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Excel file (.xlsx)</label>
         <input
           type="file"
           accept=".xlsx,.xls"
-          className="block w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-[#94CE3C]/15 file:text-[#5a8a15] hover:file:bg-[#94CE3C]/25 cursor-pointer"
+          className="block w-full text-sm text-gray-600 dark:text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-[#94CE3C]/15 file:text-[#5a8a15] dark:file:text-[#94CE3C] hover:file:bg-[#94CE3C]/25 cursor-pointer"
           onChange={(e) => {
             setFile(e.target.files?.[0] ?? null);
             setResults(null);
@@ -95,7 +95,7 @@ export default function SyncPage() {
           }}
         />
         {file && (
-          <p className="text-xs text-gray-400">{file.name} — {(file.size / 1024).toFixed(0)} KB</p>
+          <p className="text-xs text-gray-400 dark:text-gray-500">{file.name} — {(file.size / 1024).toFixed(0)} KB</p>
         )}
       </div>
 
@@ -108,18 +108,18 @@ export default function SyncPage() {
       </button>
 
       {error && (
-        <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+        <div className="rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 px-4 py-3 text-sm text-red-700 dark:text-red-400">
           {error}
         </div>
       )}
 
       {results && (
         <div className="space-y-3">
-          <h2 className="text-sm font-semibold text-gray-700">Sync complete</h2>
-          <div className="rounded-xl border border-gray-200 overflow-hidden">
+          <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Sync complete</h2>
+          <div className="rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-gray-50 text-left text-xs text-gray-500 uppercase tracking-wider border-b border-gray-200">
+                <tr className="bg-gray-50 dark:bg-gray-800 text-left text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider border-b border-gray-200 dark:border-gray-700">
                   <th className="px-4 py-2.5 font-semibold">Table</th>
                   <th className="px-4 py-2.5 font-semibold text-right">Added</th>
                   <th className="px-4 py-2.5 font-semibold text-right">Updated</th>
@@ -131,11 +131,11 @@ export default function SyncPage() {
                   const r = results[s.key as keyof SyncResults] as Record<string, number> | undefined;
                   if (!r) return null;
                   return (
-                    <tr key={s.key} className="border-t border-gray-100">
-                      <td className="px-4 py-2.5 font-medium text-gray-800">{s.table}</td>
-                      <td className="px-4 py-2.5 text-right text-green-700">{r.added ?? r.upserted ?? "—"}</td>
-                      <td className="px-4 py-2.5 text-right text-blue-700">{r.updated ?? "—"}</td>
-                      <td className="px-4 py-2.5 text-right text-gray-500">{r.deactivated ?? r.skipped ?? "—"}</td>
+                    <tr key={s.key} className="border-t border-gray-100 dark:border-gray-700">
+                      <td className="px-4 py-2.5 font-medium text-gray-800 dark:text-gray-200">{s.table}</td>
+                      <td className="px-4 py-2.5 text-right text-green-700 dark:text-green-400">{r.added ?? r.upserted ?? "—"}</td>
+                      <td className="px-4 py-2.5 text-right text-blue-700 dark:text-blue-400">{r.updated ?? "—"}</td>
+                      <td className="px-4 py-2.5 text-right text-gray-500 dark:text-gray-400">{r.deactivated ?? r.skipped ?? "—"}</td>
                     </tr>
                   );
                 })}
