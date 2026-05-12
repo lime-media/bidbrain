@@ -57,6 +57,72 @@ async function preFetchMaterials(
   return (data as MaterialCandidate[]) ?? [];
 }
 
+// Extract quote/invoice/PO numbers from natural language (e.g. "#26309", "quote 525167")
+function extractQuoteNumbers(text: string): string[] {
+  const matches = text.match(/(?:#|quote\s*#?|invoice\s*#?|po\s*#?|order\s*#?)?\b(\d{4,})\b/gi) ?? [];
+  return [...new Set(matches.map((m) => m.replace(/[^0-9]/g, "").trim()).filter((m) => m.length >= 4))];
+}
+
+interface QuoteLookupResult {
+  found: boolean;
+  quote_id: string;
+  source: "price_records" | "documents";
+  vendor_name: string | null;
+  quote_date: string | null;
+  item_count: number;
+}
+
+// Pre-search: look up quote/invoice numbers in both price_records and documents before Claude runs.
+// Prevents Claude from asking "which vendor?" when it should just query directly.
+async function preFetchByQuoteId(
+  supabase: ReturnType<typeof getSupabaseServer>,
+  question: string
+): Promise<QuoteLookupResult[]> {
+  const candidates = extractQuoteNumbers(question);
+  if (candidates.length === 0) return [];
+
+  const results: QuoteLookupResult[] = [];
+
+  for (const qid of candidates) {
+    // Check price_records
+    const { data: prRows } = await supabase
+      .from("price_records")
+      .select("quote_id, quote_date, vendors(name)")
+      .ilike("quote_id", `%${qid}%`)
+      .limit(1);
+
+    if (prRows && prRows.length > 0) {
+      const { count } = await supabase
+        .from("price_records")
+        .select("*", { count: "exact", head: true })
+        .ilike("quote_id", `%${qid}%`);
+      const row = prRows[0] as { quote_id: string; quote_date: string; vendors: { name: string } | null };
+      const vendor = Array.isArray(row.vendors) ? row.vendors[0] : row.vendors;
+      results.push({ found: true, quote_id: qid, source: "price_records", vendor_name: vendor?.name ?? null, quote_date: row.quote_date, item_count: count ?? 0 });
+      continue;
+    }
+
+    // Check documents table
+    const { data: docRows } = await supabase
+      .from("documents")
+      .select("quote_id, document_date, vendors(name)")
+      .ilike("quote_id", `%${qid}%`)
+      .limit(1);
+
+    if (docRows && docRows.length > 0) {
+      const row = docRows[0] as { quote_id: string; document_date: string; vendors: { name: string } | null };
+      const vendor = Array.isArray(row.vendors) ? row.vendors[0] : row.vendors;
+      results.push({ found: true, quote_id: qid, source: "documents", vendor_name: vendor?.name ?? null, quote_date: row.document_date, item_count: 1 });
+      continue;
+    }
+
+    // Not found anywhere
+    results.push({ found: false, quote_id: qid, source: "price_records", vendor_name: null, quote_date: null, item_count: 0 });
+  }
+
+  return results;
+}
+
 // Pre-search: resolve supplier part numbers through vendor_materials crosswalk.
 // This is the "Rosetta Stone" join — maps e.g. PHBIRC408.75 → LMB-C2-BRCH-44 (material UUID).
 // Without this, Claude would look up the crosswalk but stop at the Lime ID instead of
@@ -112,6 +178,9 @@ export async function POST(request: Request) {
     // Step 1b: Pre-fetch materials matching supplier part numbers (e.g. "PHBIRC408.75" → material UUIDs)
     const partNumberMatches = await preFetchByPartNumbers(supabase, question);
 
+    // Step 1c: Pre-fetch by quote/invoice/PO number — tells Claude whether the quote exists before it runs
+    const quoteMatches = await preFetchByQuoteId(supabase, question);
+
     let enrichedQuestion = question;
 
     if (materialCandidates.length > 0) {
@@ -141,6 +210,20 @@ export async function POST(request: Request) {
       enrichedQuestion = enrichedQuestion === question
         ? `${question}\n\n${notFoundContext}`
         : `${enrichedQuestion}\n\n${notFoundContext}`;
+    }
+
+    if (quoteMatches.length > 0) {
+      const lines = quoteMatches.map((q) => {
+        if (q.found) {
+          return `Quote/ref "${q.quote_id}" EXISTS in our database (source: ${q.source}, vendor: ${q.vendor_name ?? "unknown"}, date: ${q.quote_date ?? "unknown"}, ${q.item_count} line item(s)). Query ${q.source} WHERE quote_id ILIKE '%${q.quote_id}%' — do NOT ask which vendor, proceed directly to the query.`;
+        } else {
+          return `Quote/ref "${q.quote_id}" was NOT FOUND in price_records or documents. Do NOT ask which vendor — tell the user this quote number is not in BidBrain yet, and suggest they upload the PDF through the Upload page if they have it.`;
+        }
+      });
+      const quoteContext = `[CONTEXT: Pre-search checked the database for quote/reference numbers mentioned in this question:\n${lines.join("\n")}]`;
+      enrichedQuestion = enrichedQuestion === question
+        ? `${question}\n\n${quoteContext}`
+        : `${enrichedQuestion}\n\n${quoteContext}`;
     }
 
     // Step 2: Ask Claude to generate SQL (or answer directly for general questions)
