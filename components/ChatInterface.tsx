@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import ChatMessage from "./ChatMessage";
 import ResultsTable from "./ResultsTable";
 import { getSupabaseBrowser } from "@/lib/supabase";
@@ -24,7 +23,6 @@ export default function ChatInterface({ conversationId: initialConvId }: Props) 
   const [convId, setConvId] = useState<string | null>(initialConvId || null);
   const [userId, setUserId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const router = useRouter();
 
   useEffect(() => {
     getSupabaseBrowser()
@@ -91,7 +89,7 @@ export default function ChatInterface({ conversationId: initialConvId }: Props) 
         const created = await res.json();
         activeConvId = created.id;
         setConvId(activeConvId);
-        router.replace(`/chat/${activeConvId}`);
+        window.history.replaceState(null, "", `/chat/${activeConvId}`);
       }
 
       const res = await fetch("/api/query", {
