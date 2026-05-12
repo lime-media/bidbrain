@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import ChatMessage from "./ChatMessage";
 import ResultsTable from "./ResultsTable";
 import { getSupabaseBrowser } from "@/lib/supabase";
@@ -16,13 +17,28 @@ interface Props {
   conversationId?: string;
 }
 
+// Module-level handoff so messages survive the remount when the URL changes
+// from /chat → /chat/[id] on the first message.
+let pendingHandoff: { convId: string; messages: Message[] } | null = null;
+
 export default function ChatInterface({ conversationId: initialConvId }: Props) {
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<Message[]>(() => {
+    if (initialConvId && pendingHandoff?.convId === initialConvId) {
+      const msgs = pendingHandoff.messages;
+      pendingHandoff = null;
+      return msgs;
+    }
+    return [];
+  });
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [convId, setConvId] = useState<string | null>(initialConvId || null);
   const [userId, setUserId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
+
+  // True if messages were pre-populated from the handoff — skip DB fetch in that case.
+  const isPreloaded = useRef(messages.length > 0);
 
   useEffect(() => {
     getSupabaseBrowser()
@@ -33,6 +49,11 @@ export default function ChatInterface({ conversationId: initialConvId }: Props) 
   // Load messages when opening an existing conversation
   useEffect(() => {
     if (!initialConvId || !userId) return;
+    if (isPreloaded.current) {
+      // Already hydrated from the navigation handoff — no need to fetch
+      isPreloaded.current = false;
+      return;
+    }
     setMessages([]);
     fetch(`/api/conversations/${initialConvId}?userId=${userId}`)
       .then((r) => r.json())
@@ -63,13 +84,16 @@ export default function ChatInterface({ conversationId: initialConvId }: Props) 
     if (!question || loading) return;
 
     setInput("");
-    setMessages((prev) => [...prev, { role: "user", content: question }]);
     setLoading(true);
 
+    const userMsg: Message = { role: "user", content: question };
+    const msgsWithUser = [...messages, userMsg];
+    setMessages(msgsWithUser);
+
+    let activeConvId = convId;
+    let isNew = false;
+
     try {
-      // Include a compact summary of query results in assistant messages so Claude
-      // can answer follow-up questions ("what's the quote number for that one?")
-      // without losing context of what data was actually returned.
       const history = messages.map(({ role, content, results }) => ({
         role,
         content:
@@ -78,8 +102,6 @@ export default function ChatInterface({ conversationId: initialConvId }: Props) 
             : content,
       }));
 
-      // Create a new conversation on the first message
-      let activeConvId = convId;
       if (!activeConvId && userId) {
         const res = await fetch("/api/conversations", {
           method: "POST",
@@ -89,7 +111,7 @@ export default function ChatInterface({ conversationId: initialConvId }: Props) 
         const created = await res.json();
         activeConvId = created.id;
         setConvId(activeConvId);
-        window.history.replaceState(null, "", `/chat/${activeConvId}`);
+        isNew = true;
       }
 
       const res = await fetch("/api/query", {
@@ -101,15 +123,21 @@ export default function ChatInterface({ conversationId: initialConvId }: Props) 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
 
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content: data.answer,
-          sql: data.sql,
-          results: data.results,
-        },
-      ]);
+      const assistantMsg: Message = {
+        role: "assistant",
+        content: data.answer,
+        sql: data.sql,
+        results: data.results,
+      };
+      const finalMsgs = [...msgsWithUser, assistantMsg];
+      setMessages(finalMsgs);
+
+      // Navigate to /chat/[id] AFTER the response is saved to DB.
+      // Hand off the messages so the remounted component shows them instantly.
+      if (isNew && activeConvId) {
+        pendingHandoff = { convId: activeConvId, messages: finalMsgs };
+        router.replace(`/chat/${activeConvId}`);
+      }
     } catch {
       setMessages((prev) => [
         ...prev,
