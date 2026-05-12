@@ -139,7 +139,7 @@ export default function LineItemTable({ items, onChange }: LineItemTableProps) {
           {items.map((item, i) => (
             <tr
               key={i}
-              className="border-b border-gray-100 hover:bg-gray-50"
+              className="border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800"
             >
               <td className="py-2 pr-2 text-gray-400 overflow-hidden">{item.line_number}</td>
               <td className="py-2 pr-2 overflow-hidden">
@@ -182,7 +182,7 @@ export default function LineItemTable({ items, onChange }: LineItemTableProps) {
                     {item.match_candidates.map((c) => (
                       <button
                         key={c}
-                        className="text-xs bg-gray-100 hover:bg-[#94CE3C]/20 px-1.5 py-0.5 rounded font-mono"
+                        className="text-xs bg-gray-100 dark:bg-gray-700 dark:text-gray-200 hover:bg-[#94CE3C]/20 px-1.5 py-0.5 rounded font-mono"
                         onClick={() => {
                           updateItem(i, "lime_material_id", c);
                           updateItem(i, "is_new_material", false);
