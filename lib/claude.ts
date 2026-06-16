@@ -2,7 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 
 const client = new Anthropic();
 
-const MODEL = "claude-sonnet-4-20250514";
+const MODEL = "claude-sonnet-4-5";
 
 export async function extractDocument(
   fileBase64: string,
