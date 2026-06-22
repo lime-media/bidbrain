@@ -6,7 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { getSupabaseBrowser } from "@/lib/supabase";
 
-const links = [
+const baseLinks = [
   { href: "/", label: "Dashboard", exact: true },
   { href: "/upload", label: "Upload", exact: true },
   { href: "/documents", label: "Documents", exact: false },
@@ -18,13 +18,26 @@ export default function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
   const [email, setEmail] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     const supabase = getSupabaseBrowser();
-    supabase.auth.getUser().then(({ data }) => {
-      setEmail(data.user?.email || null);
+    supabase.auth.getUser().then(async ({ data }) => {
+      const user = data.user;
+      if (!user) return;
+      setEmail(user.email || null);
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("is_admin")
+        .eq("id", user.id)
+        .single();
+      setIsAdmin(profile?.is_admin ?? false);
     });
   }, []);
+
+  const links = isAdmin
+    ? [...baseLinks, { href: "/admin/users", label: "Users", exact: true }]
+    : baseLinks;
 
   const handleLogout = async () => {
     const supabase = getSupabaseBrowser();
