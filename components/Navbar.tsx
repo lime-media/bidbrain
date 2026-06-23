@@ -10,6 +10,7 @@ const baseLinks = [
   { href: "/", label: "Dashboard", exact: true },
   { href: "/upload", label: "Upload", exact: true },
   { href: "/documents", label: "Documents", exact: false },
+  { href: "/review", label: "Review", exact: false },
   { href: "/chat", label: "Chat", exact: false },
   { href: "/admin/sync", label: "Sync Excel", exact: true },
 ];

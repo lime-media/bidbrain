@@ -57,7 +57,7 @@ export async function POST(request: Request) {
       } else {
         const { data: newVendor, error: vendorErr } = await supabase
           .from("vendors")
-          .insert({ name: normalizedForLookup, is_active: true })
+          .insert({ name: normalizedForLookup, is_active: true, needs_review: true })
           .select("id")
           .single();
         if (vendorErr) throw vendorErr;
@@ -140,6 +140,7 @@ export async function POST(request: Request) {
               uom: item.price_uom,
               category_id: category?.id ?? null,
               is_active: true,
+              needs_review: true,
             })
             .select("id")
             .single();
