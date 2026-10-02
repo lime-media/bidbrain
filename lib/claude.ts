@@ -2,7 +2,12 @@ import Anthropic from "@anthropic-ai/sdk";
 
 const client = new Anthropic();
 
-const MODEL = "claude-sonnet-4-5";
+// Exported and env-overridable so there is ONE place to change the model.
+// It previously lived here as a private const AND as a second hardcoded
+// literal in app/api/review/suggest-orphan/route.ts, so an upgrade that
+// touched only one left the two silently on different models.
+// ANTHROPIC_MODEL lets an environment pin or roll back without a deploy.
+export const MODEL = process.env.ANTHROPIC_MODEL ?? "claude-opus-5-5";
 
 export async function extractDocument(
   fileBase64: string,

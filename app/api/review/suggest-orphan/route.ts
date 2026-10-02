@@ -1,5 +1,6 @@
 import { getSupabaseServer } from "@/lib/supabase";
 import Anthropic from "@anthropic-ai/sdk";
+import { MODEL } from "@/lib/claude";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -25,7 +26,7 @@ export async function GET(request: Request) {
 
   const client = new Anthropic();
   const response = await client.messages.create({
-    model: "claude-sonnet-4-5",
+    model: MODEL,
     max_tokens: 512,
     messages: [
       {
