@@ -1,6 +1,6 @@
 import { getSupabaseServer } from "@/lib/supabase";
 import Anthropic from "@anthropic-ai/sdk";
-import { MODEL } from "@/lib/claude";
+import { MODEL, textFromResponse } from "@/lib/claude";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -27,7 +27,10 @@ export async function GET(request: Request) {
   const client = new Anthropic();
   const response = await client.messages.create({
     model: MODEL,
-    max_tokens: 512,
+    // 512 was tuned for claude-sonnet-4-5 (answered in ~200 tokens). Opus
+    // spends tokens on a thinking block before the JSON, so the old cap
+    // truncated the answer outright.
+    max_tokens: 2048,
     messages: [
       {
         role: "user",
@@ -60,7 +63,7 @@ Return only valid JSON (no markdown):
     ],
   });
 
-  const text = response.content[0].type === "text" ? response.content[0].text : "";
+  const text = textFromResponse(response);
   const match = text.match(/\{[\s\S]*\}/);
   if (!match) return Response.json({ error: "No suggestion returned" }, { status: 500 });
 
