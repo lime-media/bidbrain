@@ -9,6 +9,33 @@ const client = new Anthropic();
 // ANTHROPIC_MODEL lets an environment pin or roll back without a deploy.
 export const MODEL = process.env.ANTHROPIC_MODEL ?? "claude-opus-5-5";
 
+/**
+ * Pulls the assistant's text out of a response.
+ *
+ * MUST NOT read content[0]. claude-opus-5-5 returns a THINKING block first and
+ * the answer second:
+ *
+ *   [0] type=thinking
+ *   [1] type=text      {"suggestedBaseId": ...}
+ *
+ * The previous `response.content[0].type === "text" ? ... : ""` therefore
+ * yielded an empty string on every call once the model moved off
+ * claude-sonnet-4-5 (single text block). That is what made
+ * /api/review/suggest-orphan 500 with "No suggestion returned" and made chat
+ * return a blank answer — the API call succeeded and was billed; the text was
+ * simply never read.
+ *
+ * Joins ALL text blocks rather than taking the first, since a response may be
+ * split across several.
+ */
+export function textFromResponse(response: Anthropic.Messages.Message): string {
+  return response.content
+    .filter((b): b is Anthropic.Messages.TextBlock => b.type === "text")
+    .map((b) => b.text)
+    .join("");
+}
+
+
 export async function extractDocument(
   fileBase64: string,
   fileType: string,
@@ -48,7 +75,7 @@ export async function extractDocument(
     ],
   });
 
-  const text = response.content[0].type === "text" ? response.content[0].text : "";
+  const text = textFromResponse(response);
   const jsonMatch = text.match(/\{[\s\S]*\}/);
   const extracted = jsonMatch ? JSON.parse(jsonMatch[0]) : null;
 
@@ -61,10 +88,10 @@ export async function queryChat(
 ) {
   const response = await client.messages.create({
     model: MODEL,
-    max_tokens: 2048,
+    max_tokens: 4096,
     system: systemPrompt,
     messages,
   });
 
-  return response.content[0].type === "text" ? response.content[0].text : "";
+  return textFromResponse(response);
 }
