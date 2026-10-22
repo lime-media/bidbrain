@@ -1,0 +1,100 @@
+name: storage-backup
+
+# Supabase's automated daily backups and PITR do not cover Storage objects —
+# the database only stores metadata about them. Without this job, nothing backs
+# up the buckets at all.
+# https://supabase.com/docs/guides/platform/backups
+
+on:
+  schedule:
+    # 07:00 UTC daily (~02:00 America/Chicago).
+    - cron: "0 7 * * *"
+  workflow_dispatch:
+
+# Only one backup at a time — concurrent runs would race on the restore-test
+# scratch path and on canary creation.
+concurrency:
+  group: storage-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      # Stamped before anything can fail, so the evidence artifact below still
+      # gets a dated name when the run fails partway through.
+      - name: Stamp run date
+        id: stamp
+        run: echo "date=$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
+
+      # No `npm ci` — the scripts use only built-in fetch and node: modules, so
+      # the one job that has to work during an incident has no install step to
+      # fail on.
+      - name: Back up all storage buckets
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          OUT_DIR: backup
+        run: node scripts/backup-storage.mjs
+
+      - name: Restore one file and verify it
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          BACKUP_DIR: backup
+        run: node scripts/verify-restore.mjs
+
+      # lime-media/bidbrain is a PUBLIC repository, and Actions artifacts on a
+      # public repo are downloadable by anyone — verified: an unauthenticated
+      # GET of /actions/artifacts on this repo returns 200. Today the archive
+      # holds only the canary, so there is nothing to leak. The moment the
+      # bucket carries real documents, uploading them here would publish them.
+      #
+      # This fails the run rather than quietly publishing. To proceed anyway,
+      # set the repository variable ALLOW_PUBLIC_ARTIFACTS to "true" — but the
+      # correct fix is to move the destination off public artifacts first.
+      # See docs/SOP-storage-backup.md.
+      - name: Guard against publishing real documents
+        if: vars.ALLOW_PUBLIC_ARTIFACTS != 'true'
+        run: |
+          real=$(node -e "
+            const m = require('./backup/manifest.json');
+            console.log(m.objects.filter(o => !o.path.startsWith('_backup-canary/')).length);
+          ")
+          if [ "$real" -gt 0 ]; then
+            echo "::error::Backup contains $real real object(s). This repository is public," \
+                 "so uploading them as an artifact would make them publicly downloadable." \
+                 "Move the backup destination off public artifacts, or set the repository" \
+                 "variable ALLOW_PUBLIC_ARTIFACTS=true to override. See docs/SOP-storage-backup.md."
+            exit 1
+          fi
+          echo "Archive contains canary objects only — safe to upload."
+
+      # 90 days is GitHub's retention ceiling. If the retention requirement is
+      # longer than that, this destination has to change — see docs/SOP-storage-backup.md.
+      - name: Upload backup
+        uses: actions/upload-artifact@v4
+        with:
+          name: storage-backup-${{ steps.stamp.outputs.date }}
+          path: backup/
+          retention-days: 90
+          if-no-files-found: error
+
+      # Kept as its own small artifact so the audit evidence can be downloaded
+      # without pulling the whole archive.
+      - name: Upload restore-check evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: restore-check-${{ steps.stamp.outputs.date }}
+          path: backup/restore-check.json
+          retention-days: 90
+          if-no-files-found: warn

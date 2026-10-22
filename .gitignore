@@ -39,3 +39,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local storage-backup archives (see .github/workflows/storage-backup.yml)
+/backup/
